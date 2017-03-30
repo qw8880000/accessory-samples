@@ -1,1 +1,1 @@
-include ':AccessoryController', ':BluetoothAudioProxy', ':ScaleMonitor', ':UsbMonitor', ':BluetoothGatt', ':BluetoothGattPeripheral', 'BluetoothAdvertiser'
+include ':AccessoryController', ':BluetoothAudioProxy', ':ScaleMonitor', ':UsbMonitor', ':BluetoothGatt', ':BluetoothGattPeripheral', ':BluetoothScanner', 'BluetoothAdvertiser'
