@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.bluetooth.BluetoothDevice;
 import android.content.Context;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -14,8 +15,9 @@ import android.widget.TextView;
 import java.util.ArrayList;
 import java.util.List;
 
-public class MainActivity extends Activity implements DvpBluetoothListener {
+public class BluetoothScannerActivity extends Activity implements DvpBluetoothListener {
 
+    private static final String TAG = BluetoothScannerActivity.class.getSimpleName();
     private List<BluetoothDevice> btDeviceList = new ArrayList<>();
     private DvpBluetoothManager dvpBluetoothManager;
     private DeviceListAdapter adapter;
@@ -50,7 +52,8 @@ public class MainActivity extends Activity implements DvpBluetoothListener {
 
     @Override
     public void onDeviceFound(final BluetoothDevice device, int rssi) {
-        // Log.d(TAG, device.getName() + ": " + device.getAddress() + ":" + rssi);
+
+        Log.d(TAG, device.getName() + ": " + device.getAddress() + ":" + rssi);
 
         runOnUiThread(new Runnable() {
 
