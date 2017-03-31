@@ -28,7 +28,15 @@ public class BluetoothScannerActivity extends Activity implements DvpBluetoothLi
         setContentView(R.layout.activity_main);
 
         dvpBluetoothManager = new DvpBluetoothManager(this, this);
+        dvpBluetoothManager.init();
+
         initViews();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        dvpBluetoothManager.deinit();
     }
 
     @Override
@@ -76,6 +84,11 @@ public class BluetoothScannerActivity extends Activity implements DvpBluetoothLi
     @Override
     public void onDiscoveryFinished() {
 
+    }
+
+    @Override
+    public void onBluetoothTurnedOn() {
+        dvpBluetoothManager.startScan();
     }
 
     private class DeviceListAdapter extends ArrayAdapter<BluetoothDevice> {

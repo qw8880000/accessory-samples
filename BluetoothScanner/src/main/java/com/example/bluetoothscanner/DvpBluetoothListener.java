@@ -9,5 +9,6 @@ public interface DvpBluetoothListener {
 	void onDiscoveryStarted();
 
 	void onDiscoveryFinished();
-	
+
+	void onBluetoothTurnedOn();
 }
