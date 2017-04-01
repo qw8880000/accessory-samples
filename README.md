@@ -1,13 +1,14 @@
-Android Accessory Examples
---------------------------
+Android Examples
+=====================
 
-This repository contains sample applications demonstrating many of the techniques for doing custom accessory development discussed in "Talk to Your Toaster".
+The sample code is licensed under the MIT Open Source License
+
+Introduction
+--------------------------
 
 Examples include:
 
-- Bluetooth RFCOMM
-- Bluetooth Headset Profile
-- USB Open Accessory Protocol
-- USB Host Protocol
+- BluetoothAdvertiser    
+- BluetoothScanner
+- BluetoothGatt
 
-The sample code is licensed under the MIT Open Source License

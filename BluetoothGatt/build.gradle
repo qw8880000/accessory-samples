@@ -1,27 +1,24 @@
-apply plugin: 'android'
-
-dependencies {
-
-}
+apply plugin: 'com.android.application'
 
 android {
     compileSdkVersion 21
     buildToolsVersion '25.0.0'
 
     defaultConfig {
-        minSdkVersion 18
+        applicationId "com.example.android.bluetoothgattperipheral"
+        minSdkVersion 21
         targetSdkVersion 21
+        versionCode 1
+        versionName "1.0"
     }
-
-    sourceSets {
-        main {
-            manifest.srcFile 'AndroidManifest.xml'
-            java.srcDirs = ['src']
-            resources.srcDirs = ['src']
-            aidl.srcDirs = ['src']
-            renderscript.srcDirs = ['src']
-            res.srcDirs = ['res']
-            assets.srcDirs = ['assets']
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+}
+
+dependencies {
+    compile fileTree(dir: 'libs', include: ['*.jar'])
 }
