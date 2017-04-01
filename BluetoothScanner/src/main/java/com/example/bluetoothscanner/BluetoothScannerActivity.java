@@ -15,7 +15,7 @@ import android.widget.TextView;
 import java.util.ArrayList;
 import java.util.List;
 
-public class BluetoothScannerActivity extends Activity implements DvpBluetoothListener {
+public class BluetoothScannerActivity extends Activity implements DvpBluetoothManager.Listener {
 
     private static final String TAG = BluetoothScannerActivity.class.getSimpleName();
     private List<BluetoothDevice> btDeviceList = new ArrayList<>();

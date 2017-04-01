@@ -8,29 +8,34 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.nfc.Tag;
-import android.util.Log;
 
-public class DvpBluetoothManager {
+public class DvpBluetoothManager extends BroadcastReceiver {
 
 	private final String TAG = DvpBluetoothManager.class.getSimpleName();
-	private Context context;
-	private DvpBluetoothBroadcastReceiver mReceiver;
-	private BluetoothManager bluetoothManager;
-	private BluetoothAdapter bluetoothAdapter;
+	private Context mContext;
+	private BluetoothManager mBluetoothManager;
+	private BluetoothAdapter mBluetoothAdapter;
+	private Listener mListener;
 	
-	public DvpBluetoothManager(Context context, DvpBluetoothListener listener) {
-		this.context = context;
-		this.mReceiver = new DvpBluetoothBroadcastReceiver(listener);
-		
-		bluetoothManager = (BluetoothManager) this.context.getSystemService(Context.BLUETOOTH_SERVICE);
-		bluetoothAdapter = bluetoothManager.getAdapter();
+	public DvpBluetoothManager(Context context, Listener listener) {
+
+		mContext = context;
+		mListener = listener;
+		mBluetoothManager = (BluetoothManager) mContext.getSystemService(Context.BLUETOOTH_SERVICE);
+		mBluetoothAdapter = mBluetoothManager.getAdapter();
 
 	}
 
+
+
 	public void init() {
-		if (!bluetoothAdapter.isEnabled()) {
-			bluetoothAdapter.enable();
+		if (!mBluetoothAdapter.isEnabled()) {
+			/**
+			 * This is an asynchronous call: it will return immediately, and
+			 * clients should listen for {@link #ACTION_STATE_CHANGED}
+			 * to be notified of if the bluetooth is turned on.
+			 */
+			mBluetoothAdapter.enable();
 		}
 
 		IntentFilter filter = new IntentFilter();
@@ -38,24 +43,24 @@ public class DvpBluetoothManager {
 		filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED);	// For devices discovery start event
 		filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);	// For devices discovery stop event
 		filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);		// For Bluetooth has been turned on or off.
-		this.context.registerReceiver(mReceiver, filter);
+		this.mContext.registerReceiver(this, filter);
 	}
 
 	public void deinit() {
-		if (bluetoothAdapter.isEnabled()) {
-			bluetoothAdapter.disable();
+		if (mBluetoothAdapter.isEnabled()) {
+			mBluetoothAdapter.disable();
 		}
 
 		// Don't forget to unregister the ACTION_FOUND receiver.
-		this.context.unregisterReceiver(mReceiver);
+		this.mContext.unregisterReceiver(this);
 	}
 
 	/**
 	 *  For BLE and classic bluetooth
 	 */
 	public void startScan() {
-		if(!bluetoothAdapter.isDiscovering()) {
-			bluetoothAdapter.startDiscovery();
+		if(!mBluetoothAdapter.isDiscovering()) {
+			mBluetoothAdapter.startDiscovery();
 		}
 	}
 
@@ -63,54 +68,45 @@ public class DvpBluetoothManager {
 	 *  For BLE and classic bluetooth
 	 */
 	public void stopScan() {
-		if(bluetoothAdapter.isDiscovering()) {
-			bluetoothAdapter.cancelDiscovery();
+		if(mBluetoothAdapter.isDiscovering()) {
+			mBluetoothAdapter.cancelDiscovery();
 		}
 	}
-    
-    private class DvpBluetoothBroadcastReceiver extends BroadcastReceiver {
 
-    	private DvpBluetoothListener listener;
-    	
-    	public DvpBluetoothBroadcastReceiver(DvpBluetoothListener listener){
-    		this.listener = listener;
-    	}
-    	
-    	@Override
-    	public void onReceive(Context context, Intent intent) {
-    		String action = intent.getAction();
-    		if (BluetoothDevice.ACTION_FOUND.equals(action)) {
-                // Discovery has found a device. Get the BluetoothDevice
-                // object and its info from the Intent.
-    	        BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-    	        int rssi = intent.getShortExtra( BluetoothDevice.EXTRA_RSSI, Short.MIN_VALUE );
-    	        this.listener.onDeviceFound(device, rssi);
-    		}
-    		else if(BluetoothAdapter.ACTION_DISCOVERY_STARTED.equals(action)) {
-    			this.listener.onDiscoveryStarted();
-    		}
-    		else if(BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
-    			this.listener.onDiscoveryFinished();
-    		}
-    		else if(BluetoothAdapter.ACTION_STATE_CHANGED.equals(action)) {
-				int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, -1);
-				int prevState = intent.getIntExtra(BluetoothAdapter.EXTRA_PREVIOUS_STATE, -1);
-				//Log.d(TAG, "state="+state+" prestate="+prevState);
+	@Override
+	public void onReceive(Context context, Intent intent) {
+		String action = intent.getAction();
+		if (BluetoothDevice.ACTION_FOUND.equals(action)) {
+			// Discovery has found a device. Get the BluetoothDevice
+			// object and its info from the Intent.
+			BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+			int rssi = intent.getShortExtra( BluetoothDevice.EXTRA_RSSI, Short.MIN_VALUE );
+			mListener.onDeviceFound(device, rssi);
+		}
+		else if(BluetoothAdapter.ACTION_DISCOVERY_STARTED.equals(action)) {
+			mListener.onDiscoveryStarted();
+		}
+		else if(BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
+			mListener.onDiscoveryFinished();
+		}
+		else if(BluetoothAdapter.ACTION_STATE_CHANGED.equals(action)) {
+			int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, -1);
+			int prevState = intent.getIntExtra(BluetoothAdapter.EXTRA_PREVIOUS_STATE, -1);
+			//Log.d(TAG, "state="+state+" prestate="+prevState);
 
-				if(prevState == BluetoothAdapter.STATE_TURNING_ON && state == BluetoothAdapter.STATE_ON) {
-					this.listener.onBluetoothTurnedOn();
-				}
-
+			if(prevState == BluetoothAdapter.STATE_TURNING_ON && state == BluetoothAdapter.STATE_ON) {
+				mListener.onBluetoothTurnedOn();
 			}
-    	}
-    }
+
+		}
+	}
 
 	/**
 	 *  Just for BLE
 	 * @param callback
 	 */
 	public void startLeScan(LeScanCallback callback) {
-		bluetoothAdapter.startLeScan(callback);
+		mBluetoothAdapter.startLeScan(callback);
 	}
 
 	/**
@@ -118,7 +114,17 @@ public class DvpBluetoothManager {
 	 * @param callback
 	 */
 	public void stopLeScan(LeScanCallback callback) {
-		bluetoothAdapter.stopLeScan(callback);
+		mBluetoothAdapter.stopLeScan(callback);
 	}
 
+	public interface Listener {
+
+		void onDeviceFound(BluetoothDevice device, int rssi);
+
+		void onDiscoveryStarted();
+
+		void onDiscoveryFinished();
+
+		void onBluetoothTurnedOn();
+	}
 }
