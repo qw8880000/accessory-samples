@@ -1,7 +1,6 @@
 package com.example.android.bluetoothgatt;
 
 import android.app.Activity;
-import android.app.TimePickerDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
@@ -24,14 +23,10 @@ import android.util.SparseArray;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.TextView;
-import android.widget.TimePicker;
+import android.widget.Button;
 import android.widget.Toast;
 
-import java.text.DateFormat;
 import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Date;
 import java.util.List;
 
 /**
@@ -39,78 +34,60 @@ import java.util.List;
  * Date: 11/13/14
  * GattClientActivity
  */
-public class GattClientActivity extends Activity {
-    private static final String TAG = "GattClientActivity";
+public class GattClientActivity extends Activity implements View.OnClickListener, DvpBluetooth.Listener {
 
-    private BluetoothManager mBluetoothManager;
+    private static final String TAG = GattClientActivity.class.getSimpleName();
+
     private BluetoothAdapter mBluetoothAdapter;
-
-    private SparseArray<BluetoothDevice> mDevices;
+    private DvpBluetooth dvpBluetooth;
 
     private BluetoothGatt mConnectedGatt;
 
-    private Handler mHandler = new Handler();
+    private SparseArray<BluetoothDevice> mDevices;
 
-    /* Client UI elements */
-    private TextView mLatestValue;
-    private TextView mCurrentOffset;
+    private Handler mHandler = new Handler();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_client);
 
-        mLatestValue = (TextView) findViewById(R.id.latest_value);
-        mCurrentOffset = (TextView) findViewById(R.id.offset_date);
-        updateDateText(0);
+        Button button = (Button) findViewById(R.id.get_number);
+        button.setOnClickListener(this);
+
+        button = (Button) findViewById(R.id.set_number);
+        button.setOnClickListener(this);
+
+        button = (Button) findViewById(R.id.get_temperature);
+        button.setOnClickListener(this);
+
+        mDevices = new SparseArray<BluetoothDevice>();
 
         /*
          * Bluetooth in Android 4.3+ is accessed via the BluetoothManager, rather than
          * the old static BluetoothAdapter.getInstance()
          */
-        mBluetoothManager = (BluetoothManager) getSystemService(BLUETOOTH_SERVICE);
-        mBluetoothAdapter = mBluetoothManager.getAdapter();
+        BluetoothManager BluetoothManager = (BluetoothManager) getSystemService(BLUETOOTH_SERVICE);
+        mBluetoothAdapter = BluetoothManager.getAdapter();
+        dvpBluetooth = new DvpBluetooth(this, this);
+        dvpBluetooth.init();
 
-        mDevices = new SparseArray<BluetoothDevice>();
+
     }
 
     @Override
-    protected void onResume() {
-        super.onResume();
-        /*
-         * We need to enforce that Bluetooth is first enabled, and take the
-         * user to settings to enable it if they have not done so.
-         */
-        if (mBluetoothAdapter == null || !mBluetoothAdapter.isEnabled()) {
-            //Bluetooth is disabled
-            Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-            startActivity(enableBtIntent);
-            finish();
-            return;
-        }
+    protected void onDestroy() {
+        super.onDestroy();
 
-        /*
-         * Check for Bluetooth LE Support.  In production, our manifest entry will keep this
-         * from installing on these devices, but this will allow test devices or other
-         * sideloads to report whether or not the feature exists.
-         */
-        if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
-            Toast.makeText(this, "No LE Support.", Toast.LENGTH_SHORT).show();
-            finish();
-            return;
-        }
-    }
-
-    @Override
-    protected void onStop() {
-        super.onStop();
-        //Stop any active scans
         stopScan();
+
         //Disconnect from any active connection
         if (mConnectedGatt != null) {
             mConnectedGatt.disconnect();
             mConnectedGatt = null;
         }
+
+        dvpBluetooth.deinit();
     }
 
     @Override
@@ -143,55 +120,6 @@ public class GattClientActivity extends Activity {
                 mConnectedGatt = device.connectGatt(this, false, mGattCallback);
                 return super.onOptionsItemSelected(item);
         }
-    }
-
-    /*
-     * Select a new time to set as the base offset
-     * on the GATT Server. Then write to the characteristic.
-     */
-    public void onUpdateClick(View v) {
-        if (mConnectedGatt != null) {
-            final Calendar now = Calendar.getInstance();
-            TimePickerDialog dialog = new TimePickerDialog(this, new TimePickerDialog.OnTimeSetListener() {
-                @Override
-                public void onTimeSet(TimePicker view, int hourOfDay, int minute) {
-                    now.set(Calendar.HOUR_OF_DAY, hourOfDay);
-                    now.set(Calendar.MINUTE, minute);
-                    now.set(Calendar.SECOND, 0);
-                    now.set(Calendar.MILLISECOND, 0);
-
-                    BluetoothGattCharacteristic characteristic = mConnectedGatt
-                            .getService(DeviceProfile.SERVICE_UUID)
-                            .getCharacteristic(DeviceProfile.CHARACTERISTIC_OFFSET_UUID);
-                    byte[] value = DeviceProfile.bytesFromInt((int)(now.getTimeInMillis()/1000));
-                    Log.d(TAG, "Writing value of size "+value.length);
-                    characteristic.setValue(value);
-
-                    mConnectedGatt.writeCharacteristic(characteristic);
-                }
-            }, now.get(Calendar.HOUR_OF_DAY), now.get(Calendar.MINUTE), false);
-            dialog.show();
-        }
-    }
-
-    /*
-     * Retrieve the current value of the time offset
-     */
-    public void onGetOffsetClick(View v) {
-        if (mConnectedGatt != null) {
-            BluetoothGattCharacteristic characteristic = mConnectedGatt
-                    .getService(DeviceProfile.SERVICE_UUID)
-                    .getCharacteristic(DeviceProfile.CHARACTERISTIC_OFFSET_UUID);
-
-            mConnectedGatt.readCharacteristic(characteristic);
-            mCurrentOffset.setText("---");
-        }
-    }
-
-    private void updateDateText(long offset) {
-        Date date = new Date(offset);
-        String dateString = DateFormat.getDateTimeInstance().format(date);
-        mCurrentOffset.setText(dateString);
     }
 
     /*
@@ -285,7 +213,7 @@ public class GattClientActivity extends Activity {
 
                 if (DeviceProfile.SERVICE_UUID.equals(service.getUuid())) {
                     //Read the current characteristic's value
-                    gatt.readCharacteristic(service.getCharacteristic(DeviceProfile.CHARACTERISTIC_ELAPSED_UUID));
+                    gatt.readCharacteristic(service.getCharacteristic(DeviceProfile.CHARACTERISTIC_TEMPERATURE_UUID));
                 }
             }
         }
@@ -297,11 +225,11 @@ public class GattClientActivity extends Activity {
             super.onCharacteristicRead(gatt, characteristic, status);
             final int charValue = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT32, 0);
 
-            if (DeviceProfile.CHARACTERISTIC_ELAPSED_UUID.equals(characteristic.getUuid())) {
+            if (DeviceProfile.CHARACTERISTIC_TEMPERATURE_UUID.equals(characteristic.getUuid())) {
                 mHandler.post(new Runnable() {
                     @Override
                     public void run() {
-                        mLatestValue.setText(String.valueOf(charValue));
+                        Toast.makeText(GattClientActivity.this, String.valueOf(charValue), Toast.LENGTH_SHORT).show();
                     }
                 });
 
@@ -309,12 +237,12 @@ public class GattClientActivity extends Activity {
                 gatt.setCharacteristicNotification(characteristic, true);
             }
 
-            if (DeviceProfile.CHARACTERISTIC_OFFSET_UUID.equals(characteristic.getUuid())) {
+            if (DeviceProfile.CHARACTERISTIC_NUMBER_UUID.equals(characteristic.getUuid())) {
                 Log.d(TAG, "Current time offset: "+charValue);
                 mHandler.post(new Runnable() {
                     @Override
                     public void run() {
-                        updateDateText((long)charValue * 1000);
+                        Toast.makeText(GattClientActivity.this, String.valueOf(charValue), Toast.LENGTH_SHORT).show();
                     }
                 });
             }
@@ -329,9 +257,70 @@ public class GattClientActivity extends Activity {
             mHandler.post(new Runnable() {
                 @Override
                 public void run() {
-                    mLatestValue.setText(String.valueOf(charValue));
+                    Toast.makeText(GattClientActivity.this, String.valueOf(charValue), Toast.LENGTH_SHORT).show();
                 }
             });
         }
     };
+
+    @Override
+    public void onClick(View v) {
+        int id = v.getId();
+        switch (id){
+            case R.id.get_number:
+                break;
+            case R.id.get_temperature:
+                onGetTemperatureClick();
+                break;
+            case R.id.set_number:
+                onSetNumberClick();
+                break;
+            default:break;
+        }
+    }
+
+    private void onGetTemperatureClick() {
+        if (mConnectedGatt != null) {
+            BluetoothGattCharacteristic characteristic = mConnectedGatt
+                    .getService(DeviceProfile.SERVICE_UUID)
+                    .getCharacteristic(DeviceProfile.CHARACTERISTIC_TEMPERATURE_UUID);
+
+            mConnectedGatt.readCharacteristic(characteristic);
+        }
+    }
+
+    private void onSetNumberClick() {
+        if (mConnectedGatt != null) {
+            BluetoothGattCharacteristic characteristic = mConnectedGatt
+                    .getService(DeviceProfile.SERVICE_UUID)
+                    .getCharacteristic(DeviceProfile.CHARACTERISTIC_NUMBER_UUID);
+            byte[] value = DeviceProfile.bytesFromInt(1024);
+            characteristic.setValue(value);
+            mConnectedGatt.writeCharacteristic(characteristic);
+        }
+    }
+
+    @Override
+    public void onBluetoothTurnedOn() {
+        /*
+         * We need to enforce that Bluetooth is first enabled, and take the
+         * user to settings to enable it if they have not done so.
+         */
+        if (mBluetoothAdapter == null || !mBluetoothAdapter.isEnabled()) {
+            //Bluetooth is disabled
+            Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+            startActivity(enableBtIntent);
+            finish();
+        }
+
+        /*
+         * Check for Bluetooth LE Support.  In production, our manifest entry will keep this
+         * from installing on these devices, but this will allow test devices or other
+         * sideloads to report whether or not the feature exists.
+         */
+        if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
+            Toast.makeText(this, "No LE Support.", Toast.LENGTH_SHORT).show();
+            finish();
+        }
+    }
 }

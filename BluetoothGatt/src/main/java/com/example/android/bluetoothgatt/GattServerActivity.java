@@ -21,7 +21,9 @@ import android.os.Handler;
 import android.os.ParcelUuid;
 import android.util.Log;
 import android.widget.ArrayAdapter;
+import android.widget.EditText;
 import android.widget.ListView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
@@ -31,7 +33,7 @@ import java.util.ArrayList;
  * Date: 11/13/14
  * GattServerActivity
  */
-public class GattServerActivity extends Activity {
+public class GattServerActivity extends Activity implements DvpBluetooth.Listener {
     private static final String TAG = "GattServerActivity";
 
     private BluetoothManager mBluetoothManager;
@@ -39,18 +41,20 @@ public class GattServerActivity extends Activity {
     private BluetoothLeAdvertiser mBluetoothLeAdvertiser;
     private BluetoothGattServer mGattServer;
 
-    private ArrayList<BluetoothDevice> mConnectedDevices;
-    private ArrayAdapter<BluetoothDevice> mConnectedDevicesAdapter;
+    private ArrayList<String> mConnectedDevices;
+    private ArrayAdapter<String> mConnectedDevicesAdapter;
+
+    private DvpBluetooth dvpBluetooth;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        ListView list = new ListView(this);
-        setContentView(list);
+        setContentView(R.layout.activity_server);
 
-        mConnectedDevices = new ArrayList<BluetoothDevice>();
-        mConnectedDevicesAdapter = new ArrayAdapter<BluetoothDevice>(this,
+        mConnectedDevices = new ArrayList<String>();
+        mConnectedDevicesAdapter = new ArrayAdapter<String>(this,
                 android.R.layout.simple_list_item_1, mConnectedDevices);
+        ListView list = (ListView) findViewById(R.id.list);
         list.setAdapter(mConnectedDevicesAdapter);
 
         /*
@@ -59,56 +63,19 @@ public class GattServerActivity extends Activity {
          */
         mBluetoothManager = (BluetoothManager) getSystemService(BLUETOOTH_SERVICE);
         mBluetoothAdapter = mBluetoothManager.getAdapter();
+
+        dvpBluetooth = new DvpBluetooth(this, this);
+        dvpBluetooth.init();
     }
 
     @Override
-    protected void onResume() {
-        super.onResume();
-        /*
-         * We need to enforce that Bluetooth is first enabled, and take the
-         * user to settings to enable it if they have not done so.
-         */
-        if (mBluetoothAdapter == null || !mBluetoothAdapter.isEnabled()) {
-            //Bluetooth is disabled
-            Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-            startActivity(enableBtIntent);
-            finish();
-            return;
-        }
+    protected void onDestroy() {
+        super.onDestroy();
 
-        /*
-         * Check for Bluetooth LE Support.  In production, our manifest entry will keep this
-         * from installing on these devices, but this will allow test devices or other
-         * sideloads to report whether or not the feature exists.
-         */
-        if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
-            Toast.makeText(this, "No LE Support.", Toast.LENGTH_SHORT).show();
-            finish();
-            return;
-        }
-
-        /*
-         * Check for advertising support. Not all devices are enabled to advertise
-         * Bluetooth LE data.
-         */
-        if (!mBluetoothAdapter.isMultipleAdvertisementSupported()) {
-            Toast.makeText(this, "No Advertising Support.", Toast.LENGTH_SHORT).show();
-            finish();
-            return;
-        }
-
-        mBluetoothLeAdvertiser = mBluetoothAdapter.getBluetoothLeAdvertiser();
-        mGattServer = mBluetoothManager.openGattServer(this, mGattServerCallback);
-
-        initServer();
-        startAdvertising();
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
         stopAdvertising();
-        shutdownServer();
+        deinitServer();
+
+        dvpBluetooth.deinit();
     }
 
     /*
@@ -116,44 +83,34 @@ public class GattServerActivity extends Activity {
      * characteristics that should be exposed
      */
     private void initServer() {
-        BluetoothGattService service =new BluetoothGattService(DeviceProfile.SERVICE_UUID,
+
+        mGattServer = mBluetoothManager.openGattServer(this, mGattServerCallback);
+
+        BluetoothGattService service = new BluetoothGattService(DeviceProfile.SERVICE_UUID,
                 BluetoothGattService.SERVICE_TYPE_PRIMARY);
 
-        BluetoothGattCharacteristic elapsedCharacteristic =
-                new BluetoothGattCharacteristic(DeviceProfile.CHARACTERISTIC_ELAPSED_UUID,
+        BluetoothGattCharacteristic temperatureCharacteristic =
+                new BluetoothGattCharacteristic(DeviceProfile.CHARACTERISTIC_TEMPERATURE_UUID,
                 //Read-only characteristic, supports notifications
                 BluetoothGattCharacteristic.PROPERTY_READ | BluetoothGattCharacteristic.PROPERTY_NOTIFY,
                 BluetoothGattCharacteristic.PERMISSION_READ);
-        BluetoothGattCharacteristic offsetCharacteristic =
-                new BluetoothGattCharacteristic(DeviceProfile.CHARACTERISTIC_OFFSET_UUID,
+        BluetoothGattCharacteristic numberCharacteristic =
+                new BluetoothGattCharacteristic(DeviceProfile.CHARACTERISTIC_NUMBER_UUID,
                 //Read+write permissions
                 BluetoothGattCharacteristic.PROPERTY_READ | BluetoothGattCharacteristic.PROPERTY_WRITE,
                 BluetoothGattCharacteristic.PERMISSION_READ | BluetoothGattCharacteristic.PERMISSION_WRITE);
 
-        service.addCharacteristic(elapsedCharacteristic);
-        service.addCharacteristic(offsetCharacteristic);
+        service.addCharacteristic(temperatureCharacteristic);
+        service.addCharacteristic(numberCharacteristic);
 
         mGattServer.addService(service);
     }
 
-    /*
-     * Terminate the server and any running callbacks
-     */
-    private void shutdownServer() {
-        mHandler.removeCallbacks(mNotifyRunnable);
+    private void deinitServer() {
 
         if (mGattServer == null) return;
-
         mGattServer.close();
     }
-
-    private Runnable mNotifyRunnable = new Runnable() {
-        @Override
-        public void run() {
-            notifyConnectedDevices();
-            mHandler.postDelayed(this, 2000);
-        }
-    };
 
     /*
      * Callback handles all incoming requests from GATT clients.
@@ -169,7 +126,6 @@ public class GattServerActivity extends Activity {
 
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 postDeviceChange(device, true);
-
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 postDeviceChange(device, false);
             }
@@ -183,20 +139,20 @@ public class GattServerActivity extends Activity {
             super.onCharacteristicReadRequest(device, requestId, offset, characteristic);
             Log.i(TAG, "onCharacteristicReadRequest " + characteristic.getUuid().toString());
 
-            if (DeviceProfile.CHARACTERISTIC_ELAPSED_UUID.equals(characteristic.getUuid())) {
+            if (DeviceProfile.CHARACTERISTIC_TEMPERATURE_UUID.equals(characteristic.getUuid())) {
                 mGattServer.sendResponse(device,
                         requestId,
                         BluetoothGatt.GATT_SUCCESS,
                         0,
-                        getStoredValue());
+                        getTemperature());
             }
 
-            if (DeviceProfile.CHARACTERISTIC_OFFSET_UUID.equals(characteristic.getUuid())) {
+            if (DeviceProfile.CHARACTERISTIC_NUMBER_UUID.equals(characteristic.getUuid())) {
                 mGattServer.sendResponse(device,
                         requestId,
                         BluetoothGatt.GATT_SUCCESS,
                         0,
-                        DeviceProfile.bytesFromInt(mTimeOffset));
+                        getNumber());
             }
 
             /*
@@ -221,9 +177,7 @@ public class GattServerActivity extends Activity {
             super.onCharacteristicWriteRequest(device, requestId, characteristic, preparedWrite, responseNeeded, offset, value);
             Log.i(TAG, "onCharacteristicWriteRequest "+characteristic.getUuid().toString());
 
-            if (DeviceProfile.CHARACTERISTIC_OFFSET_UUID.equals(characteristic.getUuid())) {
-                int newOffset = DeviceProfile.unsignedIntFromBytes(value);
-                setStoredValue(newOffset);
+            if (DeviceProfile.CHARACTERISTIC_NUMBER_UUID.equals(characteristic.getUuid())) {
 
                 if (responseNeeded) {
                     mGattServer.sendResponse(device,
@@ -233,14 +187,8 @@ public class GattServerActivity extends Activity {
                             value);
                 }
 
-                mHandler.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        Toast.makeText(GattServerActivity.this, "Time Offset Updated", Toast.LENGTH_SHORT).show();
-                    }
-                });
+                setNumber(value);
 
-                notifyConnectedDevices();
             }
         }
     };
@@ -309,44 +257,89 @@ public class GattServerActivity extends Activity {
             public void run() {
                 //This will add the item to our list and update the adapter at the same time.
                 if (toAdd) {
-                    mConnectedDevicesAdapter.add(device);
+                    mConnectedDevicesAdapter.add(device.getAddress());
                 } else {
-                    mConnectedDevicesAdapter.remove(device);
+                    mConnectedDevicesAdapter.remove(device.getAddress());
                 }
 
-                //Trigger our periodic notification once devices are connected
-                mHandler.removeCallbacks(mNotifyRunnable);
-                if (!mConnectedDevices.isEmpty()) {
-                    mHandler.post(mNotifyRunnable);
-                }
+                mConnectedDevicesAdapter.notifyDataSetChanged();
             }
         });
     }
 
     /* Storage and access to local characteristic data */
 
-    private void notifyConnectedDevices() {
+/*    private void notifyConnectedDevices() {
         for (BluetoothDevice device : mConnectedDevices) {
             BluetoothGattCharacteristic readCharacteristic = mGattServer.getService(DeviceProfile.SERVICE_UUID)
-                    .getCharacteristic(DeviceProfile.CHARACTERISTIC_ELAPSED_UUID);
+                    .getCharacteristic(DeviceProfile.CHARACTERISTIC_TEMPERATURE_UUID);
             readCharacteristic.setValue(getStoredValue());
             mGattServer.notifyCharacteristicChanged(device, readCharacteristic, false);
         }
+    }*/
+
+    @Override
+    public void onBluetoothTurnedOn() {
+        /*
+         * We need to enforce that Bluetooth is first enabled, and take the
+         * user to settings to enable it if they have not done so.
+         */
+        if (mBluetoothAdapter == null || !mBluetoothAdapter.isEnabled()) {
+            //Bluetooth is disabled
+            Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+            startActivity(enableBtIntent);
+            finish();
+            return;
+        }
+
+        /*
+         * Check for Bluetooth LE Support.  In production, our manifest entry will keep this
+         * from installing on these devices, but this will allow test devices or other
+         * sideloads to report whether or not the feature exists.
+         */
+        if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
+            Toast.makeText(this, "No LE Support.", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+
+        /*
+         * Check for advertising support. Not all devices are enabled to advertise
+         * Bluetooth LE data.
+         */
+        if (!mBluetoothAdapter.isMultipleAdvertisementSupported()) {
+            Toast.makeText(this, "No Advertising Support.", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+
+        mBluetoothLeAdvertiser = mBluetoothAdapter.getBluetoothLeAdvertiser();
+        
+        initServer();
+        startAdvertising();
     }
 
-    private Object mLock = new Object();
+    private byte[] getTemperature() {
+        EditText editText  = (EditText) findViewById(R.id.editText);
+        int temperature = Integer.valueOf(editText.getText().toString());
 
-    private int mTimeOffset;
+        Log.d(TAG, "temperature is:" + temperature);
 
-    private byte[] getStoredValue() {
-        synchronized (mLock) {
-            return DeviceProfile.getShiftedTimeValue(mTimeOffset);
-        }
+        return DeviceProfile.bytesFromInt(temperature);
     }
 
-    private void setStoredValue(int newOffset) {
-        synchronized (mLock) {
-            mTimeOffset = newOffset;
-        }
+    private byte[] getNumber() {
+        TextView textView  = (TextView) findViewById(R.id.number);
+        int number = Integer.valueOf(textView.getText().toString());
+
+        Log.d(TAG, "Number is:" + number);
+
+        return DeviceProfile.bytesFromInt(number);
+    }
+
+    private void setNumber(byte[] value) {
+        TextView textView  = (TextView) findViewById(R.id.number);
+        int number = DeviceProfile.unsignedIntFromBytes(value);
+        textView.setText(String.valueOf(number));
     }
 }

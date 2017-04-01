@@ -11,7 +11,7 @@
         android:icon="@drawable/ic_launcher"
         android:theme="@style/AppTheme">
         <activity android:name="com.example.android.bluetoothgatt.GattServerActivity"
-            android:label="@string/label_peripheral">
+            android:label="@string/label_server">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
