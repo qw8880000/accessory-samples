@@ -1,4 +1,4 @@
-package com.example.android.bluetoothgattperipheral;
+package com.example.android.bluetoothgatt;
 
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
@@ -29,10 +29,10 @@ import java.util.ArrayList;
 /**
  * Dave Smith
  * Date: 11/13/14
- * PeripheralActivity
+ * GattServerActivity
  */
-public class PeripheralActivity extends Activity {
-    private static final String TAG = "PeripheralActivity";
+public class GattServerActivity extends Activity {
+    private static final String TAG = "GattServerActivity";
 
     private BluetoothManager mBluetoothManager;
     private BluetoothAdapter mBluetoothAdapter;
@@ -236,7 +236,7 @@ public class PeripheralActivity extends Activity {
                 mHandler.post(new Runnable() {
                     @Override
                     public void run() {
-                        Toast.makeText(PeripheralActivity.this, "Time Offset Updated", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(GattServerActivity.this, "Time Offset Updated", Toast.LENGTH_SHORT).show();
                     }
                 });
 

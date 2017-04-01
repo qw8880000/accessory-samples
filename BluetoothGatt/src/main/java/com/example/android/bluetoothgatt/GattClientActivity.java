@@ -1,4 +1,4 @@
-package com.example.android.bluetoothgattperipheral;
+package com.example.android.bluetoothgatt;
 
 import android.app.Activity;
 import android.app.TimePickerDialog;
@@ -37,10 +37,10 @@ import java.util.List;
 /**
  * Dave Smith
  * Date: 11/13/14
- * ClientActivity
+ * GattClientActivity
  */
-public class ClientActivity extends Activity {
-    private static final String TAG = "ClientActivity";
+public class GattClientActivity extends Activity {
+    private static final String TAG = "GattClientActivity";
 
     private BluetoothManager mBluetoothManager;
     private BluetoothAdapter mBluetoothAdapter;

@@ -1,4 +1,4 @@
-package com.example.android.bluetoothgattperipheral;
+package com.example.android.bluetoothgatt;
 
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothProfile;
