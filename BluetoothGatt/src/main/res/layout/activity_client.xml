@@ -8,20 +8,21 @@
         android:id="@+id/get_temperature"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
         android:text="Get Temperature"/>
 
     <Button
         android:id="@+id/get_number"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
         android:text="Get Number"/>
 
     <Button
         android:id="@+id/set_number"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
         android:text="Set Number"/>
-
-
 
 </LinearLayout>

@@ -20,8 +20,9 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.ParcelUuid;
 import android.util.Log;
+import android.view.View;
 import android.widget.ArrayAdapter;
-import android.widget.EditText;
+import android.widget.Button;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -33,7 +34,7 @@ import java.util.ArrayList;
  * Date: 11/13/14
  * GattServerActivity
  */
-public class GattServerActivity extends Activity implements DvpBluetooth.Listener {
+public class GattServerActivity extends Activity implements DvpBluetooth.Listener, View.OnClickListener {
     private static final String TAG = "GattServerActivity";
 
     private BluetoothManager mBluetoothManager;
@@ -41,8 +42,9 @@ public class GattServerActivity extends Activity implements DvpBluetooth.Listene
     private BluetoothLeAdvertiser mBluetoothLeAdvertiser;
     private BluetoothGattServer mGattServer;
 
-    private ArrayList<String> mConnectedDevices;
-    private ArrayAdapter<String> mConnectedDevicesAdapter;
+    private ArrayList<BluetoothDevice> mConnectedDevices = new ArrayList<BluetoothDevice>();
+    private ArrayList<String> mDeviceList = new ArrayList<String>();
+    private ArrayAdapter<String> mDevicesListAdapter;
 
     private DvpBluetooth dvpBluetooth;
 
@@ -51,11 +53,13 @@ public class GattServerActivity extends Activity implements DvpBluetooth.Listene
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_server);
 
-        mConnectedDevices = new ArrayList<String>();
-        mConnectedDevicesAdapter = new ArrayAdapter<String>(this,
-                android.R.layout.simple_list_item_1, mConnectedDevices);
+        mDevicesListAdapter = new ArrayAdapter<String>(this,
+                android.R.layout.simple_list_item_1, mDeviceList);
         ListView list = (ListView) findViewById(R.id.list);
-        list.setAdapter(mConnectedDevicesAdapter);
+        list.setAdapter(mDevicesListAdapter);
+
+        Button button = (Button) findViewById(R.id.notify);
+        button.setOnClickListener(this);
 
         /*
          * Bluetooth in Android 4.3+ is accessed via the BluetoothManager, rather than
@@ -173,7 +177,7 @@ public class GattServerActivity extends Activity implements DvpBluetooth.Listene
                                                  boolean preparedWrite,
                                                  boolean responseNeeded,
                                                  int offset,
-                                                 byte[] value) {
+                                                 final byte[] value) {
             super.onCharacteristicWriteRequest(device, requestId, characteristic, preparedWrite, responseNeeded, offset, value);
             Log.i(TAG, "onCharacteristicWriteRequest "+characteristic.getUuid().toString());
 
@@ -187,8 +191,12 @@ public class GattServerActivity extends Activity implements DvpBluetooth.Listene
                             value);
                 }
 
-                setNumber(value);
-
+                mHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        setNumber(value);
+                    }
+                });
             }
         }
     };
@@ -230,13 +238,13 @@ public class GattServerActivity extends Activity implements DvpBluetooth.Listene
     private AdvertiseCallback mAdvertiseCallback = new AdvertiseCallback() {
         @Override
         public void onStartSuccess(AdvertiseSettings settingsInEffect) {
-            Log.i(TAG, "Peripheral Advertise Started.");
+            Log.i(TAG, "Advertisement Started.");
             postStatusMessage("GATT Server Ready");
         }
 
         @Override
         public void onStartFailure(int errorCode) {
-            Log.w(TAG, "Peripheral Advertise Failed: "+errorCode);
+            Log.w(TAG, "Advertisement Failed: "+errorCode);
             postStatusMessage("GATT Server Error "+errorCode);
         }
     };
@@ -255,28 +263,25 @@ public class GattServerActivity extends Activity implements DvpBluetooth.Listene
         mHandler.post(new Runnable() {
             @Override
             public void run() {
+                String line;
+                if(device.getName() != null){
+                    line = device.getName() + "  " + device.getAddress();
+                } else {
+                    line = "Unknown Device" + "  " + device.getAddress();
+                }
                 //This will add the item to our list and update the adapter at the same time.
                 if (toAdd) {
-                    mConnectedDevicesAdapter.add(device.getAddress());
+                    mDevicesListAdapter.add(line);
+                    mConnectedDevices.add(device);
                 } else {
-                    mConnectedDevicesAdapter.remove(device.getAddress());
+                    mDevicesListAdapter.remove(line);
+                    mConnectedDevices.remove(device);
                 }
 
-                mConnectedDevicesAdapter.notifyDataSetChanged();
+                mDevicesListAdapter.notifyDataSetChanged();
             }
         });
     }
-
-    /* Storage and access to local characteristic data */
-
-/*    private void notifyConnectedDevices() {
-        for (BluetoothDevice device : mConnectedDevices) {
-            BluetoothGattCharacteristic readCharacteristic = mGattServer.getService(DeviceProfile.SERVICE_UUID)
-                    .getCharacteristic(DeviceProfile.CHARACTERISTIC_TEMPERATURE_UUID);
-            readCharacteristic.setValue(getStoredValue());
-            mGattServer.notifyCharacteristicChanged(device, readCharacteristic, false);
-        }
-    }*/
 
     @Override
     public void onBluetoothTurnedOn() {
@@ -320,8 +325,8 @@ public class GattServerActivity extends Activity implements DvpBluetooth.Listene
     }
 
     private byte[] getTemperature() {
-        EditText editText  = (EditText) findViewById(R.id.editText);
-        int temperature = Integer.valueOf(editText.getText().toString());
+        TextView textView  = (TextView) findViewById(R.id.temperature);
+        int temperature = Integer.valueOf(textView.getText().toString());
 
         Log.d(TAG, "temperature is:" + temperature);
 
@@ -341,5 +346,24 @@ public class GattServerActivity extends Activity implements DvpBluetooth.Listene
         TextView textView  = (TextView) findViewById(R.id.number);
         int number = DeviceProfile.unsignedIntFromBytes(value);
         textView.setText(String.valueOf(number));
+    }
+
+    private void setNotify() {
+        for (BluetoothDevice device : mConnectedDevices) {
+            BluetoothGattCharacteristic readCharacteristic = mGattServer.getService(DeviceProfile.SERVICE_UUID)
+                    .getCharacteristic(DeviceProfile.CHARACTERISTIC_TEMPERATURE_UUID);
+            readCharacteristic.setValue(DeviceProfile.bytesFromInt(2048));
+            mGattServer.notifyCharacteristicChanged(device, readCharacteristic, false);
+        }
+    }
+
+    @Override
+    public void onClick(View v) {
+        int id = v.getId();
+        switch (id) {
+            case R.id.notify:
+                setNotify();
+                break;
+        }
     }
 }

@@ -69,9 +69,12 @@ public class GattClientActivity extends Activity implements View.OnClickListener
          */
         BluetoothManager BluetoothManager = (BluetoothManager) getSystemService(BLUETOOTH_SERVICE);
         mBluetoothAdapter = BluetoothManager.getAdapter();
+
+        /*
+         * open bluetooth
+         */
         dvpBluetooth = new DvpBluetooth(this, this);
         dvpBluetooth.init();
-
 
     }
 
@@ -192,14 +195,22 @@ public class GattClientActivity extends Activity implements View.OnClickListener
      */
     private BluetoothGattCallback mGattCallback = new BluetoothGattCallback() {
         @Override
-        public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
+        public void onConnectionStateChange(BluetoothGatt gatt, final int status, int newState) {
             super.onConnectionStateChange(gatt, status, newState);
             Log.d(TAG, "onConnectionStateChange "
                     +DeviceProfile.getStatusDescription(status)+" "
                     +DeviceProfile.getStateDescription(newState));
 
             if (newState == BluetoothProfile.STATE_CONNECTED) {
+
                 gatt.discoverServices();
+
+                mHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(GattClientActivity.this, "Connect to server:" + DeviceProfile.getStatusDescription(status), Toast.LENGTH_SHORT).show();
+                    }
+                });
             }
         }
 
@@ -211,9 +222,12 @@ public class GattClientActivity extends Activity implements View.OnClickListener
             for (BluetoothGattService service : gatt.getServices()) {
                 Log.d(TAG, "Service: "+service.getUuid());
 
-                if (DeviceProfile.SERVICE_UUID.equals(service.getUuid())) {
-                    //Read the current characteristic's value
-                    gatt.readCharacteristic(service.getCharacteristic(DeviceProfile.CHARACTERISTIC_TEMPERATURE_UUID));
+                if(DeviceProfile.SERVICE_UUID.equals(service.getUuid())) {
+                    BluetoothGattCharacteristic characteristic = mConnectedGatt
+                            .getService(DeviceProfile.SERVICE_UUID)
+                            .getCharacteristic(DeviceProfile.CHARACTERISTIC_TEMPERATURE_UUID);
+                    //Register for further updates as notifications
+                    gatt.setCharacteristicNotification(characteristic, true);
                 }
             }
         }
@@ -229,20 +243,17 @@ public class GattClientActivity extends Activity implements View.OnClickListener
                 mHandler.post(new Runnable() {
                     @Override
                     public void run() {
-                        Toast.makeText(GattClientActivity.this, String.valueOf(charValue), Toast.LENGTH_SHORT).show();
+                        Toast.makeText(GattClientActivity.this, "The temperature is:" + String.valueOf(charValue), Toast.LENGTH_SHORT).show();
                     }
                 });
 
-                //Register for further updates as notifications
-                gatt.setCharacteristicNotification(characteristic, true);
             }
 
             if (DeviceProfile.CHARACTERISTIC_NUMBER_UUID.equals(characteristic.getUuid())) {
-                Log.d(TAG, "Current time offset: "+charValue);
                 mHandler.post(new Runnable() {
                     @Override
                     public void run() {
-                        Toast.makeText(GattClientActivity.this, String.valueOf(charValue), Toast.LENGTH_SHORT).show();
+                        Toast.makeText(GattClientActivity.this, "The number is:" + String.valueOf(charValue), Toast.LENGTH_SHORT).show();
                     }
                 });
             }
@@ -252,14 +263,30 @@ public class GattClientActivity extends Activity implements View.OnClickListener
         public void onCharacteristicChanged(BluetoothGatt gatt,
                                             BluetoothGattCharacteristic characteristic) {
             super.onCharacteristicChanged(gatt, characteristic);
-            Log.i(TAG, "Notification of time characteristic changed on server.");
+
             final int charValue = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT32, 0);
             mHandler.post(new Runnable() {
                 @Override
                 public void run() {
-                    Toast.makeText(GattClientActivity.this, String.valueOf(charValue), Toast.LENGTH_SHORT).show();
+                    Log.i(TAG, "Notification of characteristic changed on server.");
+                    Toast.makeText(GattClientActivity.this, "Notification:" + String.valueOf(charValue), Toast.LENGTH_SHORT).show();
                 }
             });
+        }
+
+        @Override
+        public void onCharacteristicWrite(BluetoothGatt gatt,
+                                          BluetoothGattCharacteristic characteristic, final int status) {
+            super.onCharacteristicWrite(gatt, characteristic, status);
+
+            if (DeviceProfile.CHARACTERISTIC_NUMBER_UUID.equals(characteristic.getUuid())) {
+                mHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(GattClientActivity.this, "Write number " + DeviceProfile.getStatusDescription(status), Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
         }
     };
 
@@ -268,6 +295,7 @@ public class GattClientActivity extends Activity implements View.OnClickListener
         int id = v.getId();
         switch (id){
             case R.id.get_number:
+                onGetNumberClick();
                 break;
             case R.id.get_temperature:
                 onGetTemperatureClick();
@@ -276,6 +304,16 @@ public class GattClientActivity extends Activity implements View.OnClickListener
                 onSetNumberClick();
                 break;
             default:break;
+        }
+    }
+
+    private void onGetNumberClick() {
+        if (mConnectedGatt != null) {
+            BluetoothGattCharacteristic characteristic = mConnectedGatt
+                    .getService(DeviceProfile.SERVICE_UUID)
+                    .getCharacteristic(DeviceProfile.CHARACTERISTIC_NUMBER_UUID);
+
+            mConnectedGatt.readCharacteristic(characteristic);
         }
     }
 
