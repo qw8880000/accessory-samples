@@ -32,6 +32,7 @@ public class AdvertiserActivity extends Activity implements
 
     /* Full Bluetooth UUID that defines the Health Thermometer Service */
     public static final ParcelUuid THERM_SERVICE = ParcelUuid.fromString("00001809-0000-1000-8000-00805f9b34fb");
+    private static final int MANUFACTURER_ID_FOR_MAC = 1;   //
 
     private BluetoothAdapter mBluetoothAdapter;
     private BluetoothLeAdvertiser mBluetoothLeAdvertiser;
@@ -92,7 +93,8 @@ public class AdvertiserActivity extends Activity implements
                 .setIncludeDeviceName(true)
                 .setIncludeTxPowerLevel(true)
                 .addServiceUuid(THERM_SERVICE)
-                .addServiceData(THERM_SERVICE, buildTempPacket())
+                //.addServiceData(THERM_SERVICE, buildTempPacket())
+                .addManufacturerData(MANUFACTURER_ID_FOR_MAC, buildTempPacket())
                 .build();
 
         mBluetoothLeAdvertiser.startAdvertising(settings, data, mAdvertiseCallback);
