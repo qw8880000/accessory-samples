@@ -1,6 +1,7 @@
 package com.example.bluetoothscanner;
 
 import android.app.Activity;
+import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.Context;
 import android.os.Bundle;
@@ -15,7 +16,7 @@ import android.widget.TextView;
 import java.util.ArrayList;
 import java.util.List;
 
-public class BluetoothScannerActivity extends Activity implements DvpBluetoothManager.Listener {
+public class BluetoothScannerActivity extends Activity implements DvpBluetoothManager.Listener, BluetoothAdapter.LeScanCallback {
 
     private static final String TAG = BluetoothScannerActivity.class.getSimpleName();
     private List<BluetoothDevice> btDeviceList = new ArrayList<>();
@@ -42,13 +43,15 @@ public class BluetoothScannerActivity extends Activity implements DvpBluetoothMa
     @Override
     public void onResume() {
         super.onResume();
-        dvpBluetoothManager.startScan();
+        //dvpBluetoothManager.startScan();
+        dvpBluetoothManager.startLeScan(this);
     }
 
     @Override
     public void onPause() {
         super.onPause();
         dvpBluetoothManager.stopScan();
+        dvpBluetoothManager.stopLeScan(this);
     }
 
     private void initViews() {
@@ -89,6 +92,12 @@ public class BluetoothScannerActivity extends Activity implements DvpBluetoothMa
     @Override
     public void onBluetoothTurnedOn() {
         dvpBluetoothManager.startScan();
+    }
+
+    @Override
+    public void onLeScan(BluetoothDevice device, int rssi, byte[] scanRecord) {
+        ScanRecord record = ScanRecord.parseFromBytes(scanRecord);
+        Log.i(TAG, record.toString());
     }
 
     private class DeviceListAdapter extends ArrayAdapter<BluetoothDevice> {

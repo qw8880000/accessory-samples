@@ -17,6 +17,8 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.lang.reflect.Array;
+
 /**
  * Dave Smith
  * Date: 11/12/14
@@ -108,14 +110,24 @@ public class AdvertiserActivity extends Activity implements
     }
 
     private byte[] buildTempPacket() {
-        int value;
-        try {
-            value = Integer.parseInt(mCurrentValue.getText().toString());
-        } catch (NumberFormatException e) {
-            value = 0;
-        }
 
-        return new byte[] {(byte)value, 0x00};
+        /*
+         * get mac address
+         */
+        String address = mBluetoothAdapter.getAddress();
+        if(address != null) {
+            byte[] addressBytes = new byte[6];
+            String[] addressParts = address.split(":");
+            for(int i=0; i<6; i++){
+                Integer hex = Integer.parseInt(addressParts[i], 16);
+                addressBytes[i] = hex.byteValue();
+            }
+
+            Log.i(TAG, "address is:" + new String(addressBytes));
+            return addressBytes;
+        } else {
+            return new byte[] {0x01,0x02};
+        }
     }
 
     private AdvertiseCallback mAdvertiseCallback = new AdvertiseCallback() {
@@ -127,6 +139,7 @@ public class AdvertiserActivity extends Activity implements
         @Override
         public void onStartFailure(int errorCode) {
             Log.w(TAG, "LE Advertise Failed: "+errorCode);
+            Toast.makeText(AdvertiserActivity.this, "LE Advertise Failed:" + errorCode, Toast.LENGTH_SHORT).show();
         }
     };
 
