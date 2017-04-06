@@ -179,7 +179,7 @@ public class GattClientActivity extends Activity implements View.OnClickListener
 
         private void processResult(ScanResult result) {
             BluetoothDevice device = result.getDevice();
-            Log.i(TAG, "New LE Device: " + device.getName() + " @ " + result.getRssi());
+            Log.i(TAG, "New LE Device: " + device.getName() + " @ " + result.getRssi() + " @ " + device.getAddress());
             //Add it to the collection
             mDevices.put(device.hashCode(), device);
             //Update the overflow menu

@@ -68,6 +68,8 @@ public class GattServerActivity extends Activity implements DvpBluetooth.Listene
         mBluetoothManager = (BluetoothManager) getSystemService(BLUETOOTH_SERVICE);
         mBluetoothAdapter = mBluetoothManager.getAdapter();
 
+
+
         dvpBluetooth = new DvpBluetooth(this, this);
         dvpBluetooth.init();
     }
@@ -328,7 +330,7 @@ public class GattServerActivity extends Activity implements DvpBluetooth.Listene
         TextView textView  = (TextView) findViewById(R.id.temperature);
         int temperature = Integer.valueOf(textView.getText().toString());
 
-        Log.d(TAG, "temperature is:" + temperature);
+        Log.i(TAG, "temperature is:" + temperature);
 
         return DeviceProfile.bytesFromInt(temperature);
     }
@@ -337,7 +339,7 @@ public class GattServerActivity extends Activity implements DvpBluetooth.Listene
         TextView textView  = (TextView) findViewById(R.id.number);
         int number = Integer.valueOf(textView.getText().toString());
 
-        Log.d(TAG, "Number is:" + number);
+        Log.i(TAG, "Number is:" + number);
 
         return DeviceProfile.bytesFromInt(number);
     }
