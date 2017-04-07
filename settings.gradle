@@ -1,1 +1,1 @@
-include ':BluetoothAudioProxy', ':BluetoothGatt', ':BluetoothScanner', 'BluetoothAdvertiser'
+include ':BluetoothAudioProxy', ':BluetoothGatt', ':BluetoothScanner', ':BluetoothLeUnlock', 'BluetoothAdvertiser'
