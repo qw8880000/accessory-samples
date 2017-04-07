@@ -13,8 +13,6 @@ import android.os.ParcelUuid;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
-import android.widget.SeekBar;
-import android.widget.TextView;
 import android.widget.Toast;
 
 /**
@@ -22,11 +20,9 @@ import android.widget.Toast;
  * Date: 11/12/14
  * AdvertiserActivity
  */
-public class AdvertiserActivity extends Activity implements
-        SeekBar.OnSeekBarChangeListener, View.OnClickListener, DvpBluetooth.Listener {
+public class AdvertiserActivity extends Activity implements View.OnClickListener, DvpBluetooth.Listener {
 
     private static final String TAG = AdvertiserActivity.class.getSimpleName();
-    private static final int DEFAULT_VALUE = 20;
 
     /* Full Bluetooth UUID that defines the Health Thermometer Service */
     public static final ParcelUuid THERM_SERVICE = ParcelUuid.fromString("00001809-0000-1000-8000-00805f9b34fb");
@@ -36,21 +32,10 @@ public class AdvertiserActivity extends Activity implements
     private BluetoothLeAdvertiser mBluetoothLeAdvertiser;
     private DvpBluetooth mDvpBluetooth;
 
-    /* UI to control advertise value */
-    private TextView mCurrentValue;
-    private SeekBar mSlider;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_advertiser);
-
-        mCurrentValue = (TextView) findViewById(R.id.current);
-        mSlider = (SeekBar) findViewById(R.id.slider);
-
-        mSlider.setMax(100);
-        mSlider.setOnSeekBarChangeListener(this);
-        mSlider.setProgress(DEFAULT_VALUE);
 
         Button button = (Button) findViewById(R.id.update);
         button.setOnClickListener(this);
@@ -142,23 +127,6 @@ public class AdvertiserActivity extends Activity implements
             Toast.makeText(AdvertiserActivity.this, "LE Advertise Failed:" + errorCode, Toast.LENGTH_SHORT).show();
         }
     };
-
-    /** Callbacks to update UI when slider changes */
-
-    @Override
-    public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-        mCurrentValue.setText(String.valueOf(progress));
-    }
-
-    @Override
-    public void onStartTrackingTouch(SeekBar seekBar) {
-
-    }
-
-    @Override
-    public void onStopTrackingTouch(SeekBar seekBar) {
-
-    }
 
     @Override
     public void onClick(View v) {
