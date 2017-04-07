@@ -17,8 +17,6 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.lang.reflect.Array;
-
 /**
  * Dave Smith
  * Date: 11/12/14
