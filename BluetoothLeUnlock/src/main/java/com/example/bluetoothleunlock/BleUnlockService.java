@@ -1,6 +1,6 @@
 package com.example.bluetoothleunlock;
 
-import android.app.Activity;
+import android.app.IntentService;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.le.AdvertiseCallback;
@@ -9,29 +9,33 @@ import android.bluetooth.le.AdvertiseSettings;
 import android.bluetooth.le.BluetoothLeAdvertiser;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.os.Bundle;
-import android.os.CountDownTimer;
 import android.util.Log;
-import android.view.View;
-import android.widget.Button;
 import android.widget.Toast;
 
 import static com.example.bluetoothleunlock.UnlockProfile.buildManufacturerData;
 
-public class BleUnlockActivity extends Activity implements View.OnClickListener, DvpBluetooth.Listener {
+/**
+ * Created by qw8880000 on 2017-04-07.
+ */
 
-    private static final String TAG = BleUnlockActivity.class.getSimpleName();
+public class BleUnlockService extends IntentService implements DvpBluetooth.Listener{
 
-    private BluetoothAdapter mBluetoothAdapter;
+    private final String TAG = BleUnlockService.class.getSimpleName();
+    private boolean isRunning = true;
     private BluetoothLeAdvertiser mBluetoothLeAdvertiser;
+    private BluetoothAdapter mBluetoothAdapter;
 
+    /**
+     * Creates an IntentService.  Invoked by your subclass's constructor.
+     */
+    public BleUnlockService() {
+        super("BleUnlockService");
+        Log.i(TAG, "start");
+    }
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_ble_unlock);
-
-        Button button = (Button) findViewById(R.id.open);
-        button.setOnClickListener(this);
+    public void onCreate() {
+        super.onCreate();
+        Log.i(TAG, "create");
 
         BluetoothManager manager = (BluetoothManager) getSystemService(BLUETOOTH_SERVICE);
         mBluetoothAdapter = manager.getAdapter();
@@ -40,25 +44,31 @@ public class BleUnlockActivity extends Activity implements View.OnClickListener,
             DvpBluetooth.openBluetooth(this, this);
         } else {
             initBluetoothLeAdvertiser();
+            startAdvertising();
         }
-
-        stopService();
     }
 
     @Override
-    protected void onDestroy() {
+    public void onDestroy() {
+        isRunning = false;
+        stopAdvertising();
+
         super.onDestroy();
-        startService();
+
+        Log.i(TAG, "destroy");
     }
 
-    private void stopService() {
-        Intent startIntent = new Intent(this, BleUnlockService.class);
-        this.stopService(startIntent);
-    }
+    @Override
+    protected void onHandleIntent(Intent intent) {
 
-    private void startService() {
-        Intent startIntent = new Intent(this, BleUnlockService.class);
-        this.startService(startIntent);
+        try {
+            while (isRunning){
+                Thread.sleep(5000);
+                Log.i(TAG, "running");
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 
     private void startAdvertising() {
@@ -75,7 +85,7 @@ public class BleUnlockActivity extends Activity implements View.OnClickListener,
                 .setIncludeDeviceName(true)
                 .setIncludeTxPowerLevel(true)
                 .addServiceUuid(UnlockProfile.UNLOCK_SERVICE)
-                .addManufacturerData(UnlockProfile.MANUFACTURER_ID, buildManufacturerData(mBluetoothAdapter.getAddress(), UnlockProfile.UNLOCK_MODE_MANUAL))
+                .addManufacturerData(UnlockProfile.MANUFACTURER_ID, buildManufacturerData(mBluetoothAdapter.getAddress(), UnlockProfile.UNLOCK_MODE_AUTO))
                 .build();
 
         mBluetoothLeAdvertiser.startAdvertising(settings, data, mAdvertiseCallback);
@@ -85,6 +95,8 @@ public class BleUnlockActivity extends Activity implements View.OnClickListener,
         if (mBluetoothLeAdvertiser == null) return;
 
         mBluetoothLeAdvertiser.stopAdvertising(mAdvertiseCallback);
+
+        mBluetoothLeAdvertiser = null;
     }
 
     private AdvertiseCallback mAdvertiseCallback = new AdvertiseCallback() {
@@ -96,7 +108,7 @@ public class BleUnlockActivity extends Activity implements View.OnClickListener,
         @Override
         public void onStartFailure(int errorCode) {
             Log.w(TAG, "LE Advertise Failed: "+errorCode);
-            Toast.makeText(BleUnlockActivity.this, "LE Advertise Failed:" + errorCode, Toast.LENGTH_SHORT).show();
+            //Toast.makeText(BleUnlockService.this, "LE Advertise Failed:" + errorCode, Toast.LENGTH_SHORT).show();
         }
     };
 
@@ -105,8 +117,8 @@ public class BleUnlockActivity extends Activity implements View.OnClickListener,
         * Check for Bluetooth LE Support.
         */
         if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
-            Toast.makeText(this, "No LE Support.", Toast.LENGTH_SHORT).show();
-            finish();
+            //Toast.makeText(this, "No LE Support.", Toast.LENGTH_SHORT).show();
+            return;
         }
 
         /*
@@ -114,8 +126,8 @@ public class BleUnlockActivity extends Activity implements View.OnClickListener,
          * Bluetooth LE data.
          */
         if (!mBluetoothAdapter.isMultipleAdvertisementSupported()) {
-            Toast.makeText(this, "No Advertising Support.", Toast.LENGTH_SHORT).show();
-            finish();
+            //Toast.makeText(this, "No Advertising Support.", Toast.LENGTH_SHORT).show();
+            return;
         }
 
         /*
@@ -124,33 +136,9 @@ public class BleUnlockActivity extends Activity implements View.OnClickListener,
         mBluetoothLeAdvertiser = mBluetoothAdapter.getBluetoothLeAdvertiser();
     }
 
-    private CountDownTimer timer = new CountDownTimer(2000, 1000) {
-
-        @Override
-        public void onTick(long millisUntilFinished) {
-
-        }
-
-        @Override
-        public void onFinish() {
-            stopAdvertising();
-        }
-    };
-
-    @Override
-    public void onClick(View v) {
-        int id = v.getId();
-        switch(id) {
-            case R.id.open:
-                startAdvertising();
-                timer.start();
-                break;
-            default:break;
-        }
-    }
-
     @Override
     public void onBluetoothTurnedOn() {
         initBluetoothLeAdvertiser();
+        startAdvertising();
     }
 }
